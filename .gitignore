@@ -1,0 +1,38 @@
+# 環境変数・シークレット（絶対にGitHubに上げない）
+.env
+.env.local
+.env.*.local
+
+# データベース（個人データが入るため除外）
+database.db
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Claude Code ローカル設定
+.claude/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ログ
+*.log
