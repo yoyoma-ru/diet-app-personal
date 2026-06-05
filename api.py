@@ -1,0 +1,280 @@
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
+from datetime import date, timedelta
+from models import db, Profile, WeightLog, CalorieLog
+
+api_bp = Blueprint('api', __name__)
+
+ACTIVITY_FACTORS = {
+    'sedentary': 1.2,
+    'light': 1.375,
+    'moderate': 1.55,
+    'active': 1.725,
+    'very_active': 1.9,
+}
+
+
+def _calc_nutrition(profile, current_weight):
+    bmr = 10 * current_weight + 6.25 * profile.height - 5 * profile.age + 5
+    tdee = bmr * ACTIVITY_FACTORS.get(profile.activity_level, 1.2)
+    days_remaining = max(1, (profile.target_date - date.today()).days)
+    weight_to_lose = max(0.0, current_weight - profile.target_weight)
+    required_deficit = weight_to_lose * 7700 / days_remaining
+    recommended = max(1200, tdee - required_deficit)
+    return {
+        'bmr': round(bmr),
+        'tdee': round(tdee),
+        'required_deficit': round(required_deficit),
+        'recommended_intake': round(recommended),
+    }
+
+
+def _latest_weight(user_id):
+    log = WeightLog.query.filter_by(user_id=user_id).order_by(WeightLog.date.desc()).first()
+    return log.weight if log else None
+
+
+# ── プロフィール ──────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/profile')
+@login_required
+def get_profile():
+    p = current_user.profile
+    return jsonify({
+        'height': p.height,
+        'start_weight': p.start_weight,
+        'target_weight': p.target_weight,
+        'target_date': p.target_date.isoformat(),
+        'age': p.age,
+        'activity_level': p.activity_level,
+    })
+
+
+@api_bp.route('/api/profile', methods=['PUT'])
+@login_required
+def update_profile():
+    p = current_user.profile
+    d = request.get_json()
+    if 'height' in d:
+        p.height = int(d['height'])
+    if 'start_weight' in d:
+        p.start_weight = float(d['start_weight'])
+    if 'target_weight' in d:
+        p.target_weight = float(d['target_weight'])
+    if 'target_date' in d:
+        p.target_date = date.fromisoformat(d['target_date'])
+    if 'age' in d:
+        p.age = int(d['age'])
+    if 'activity_level' in d:
+        p.activity_level = d['activity_level']
+    db.session.commit()
+    return jsonify({'message': 'プロフィールを更新しました'})
+
+
+# ── 体重記録 ──────────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/weight')
+@login_required
+def get_weight():
+    logs = WeightLog.query.filter_by(user_id=current_user.id).order_by(WeightLog.date).all()
+    return jsonify([{'id': l.id, 'date': l.date.isoformat(), 'weight': l.weight} for l in logs])
+
+
+@api_bp.route('/api/weight', methods=['POST'])
+@login_required
+def add_weight():
+    d = request.get_json()
+    log_date = date.fromisoformat(d.get('date', date.today().isoformat()))
+    weight = float(d['weight'])
+
+    existing = WeightLog.query.filter_by(user_id=current_user.id, date=log_date).first()
+    if existing:
+        existing.weight = weight
+        db.session.commit()
+        return jsonify({'id': existing.id, 'date': log_date.isoformat(), 'weight': weight})
+
+    log = WeightLog(user_id=current_user.id, date=log_date, weight=weight)
+    db.session.add(log)
+    db.session.commit()
+    return jsonify({'id': log.id, 'date': log_date.isoformat(), 'weight': weight}), 201
+
+
+@api_bp.route('/api/weight/<int:log_id>', methods=['DELETE'])
+@login_required
+def delete_weight(log_id):
+    log = WeightLog.query.filter_by(id=log_id, user_id=current_user.id).first_or_404()
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({'message': '削除しました'})
+
+
+# ── カロリー記録 ──────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/calories/<string:log_date>')
+@login_required
+def get_calories(log_date):
+    d = date.fromisoformat(log_date)
+    logs = CalorieLog.query.filter_by(user_id=current_user.id, date=d).all()
+
+    meals = [{'id': l.id, 'name': l.name, 'calories': l.calories} for l in logs if l.type == 'meal']
+    exercises = [{'id': l.id, 'name': l.name, 'calories': l.calories} for l in logs if l.type == 'exercise']
+
+    total_intake = sum(i['calories'] for i in meals)
+    total_burned = sum(i['calories'] for i in exercises)
+
+    today_log = WeightLog.query.filter_by(user_id=current_user.id, date=d).first()
+    current_weight = today_log.weight if today_log else (_latest_weight(current_user.id) or current_user.profile.start_weight)
+    nutrition = _calc_nutrition(current_user.profile, current_weight)
+
+    return jsonify({
+        'meals': meals,
+        'exercises': exercises,
+        'total_intake': total_intake,
+        'total_burned': total_burned,
+        'net_calories': total_intake - total_burned,
+        'recommended_intake': nutrition['recommended_intake'],
+        'remaining': nutrition['recommended_intake'] - total_intake + total_burned,
+        'bmr': nutrition['bmr'],
+        'tdee': nutrition['tdee'],
+        'current_weight': current_weight,
+    })
+
+
+@api_bp.route('/api/calories', methods=['POST'])
+@login_required
+def add_calorie():
+    d = request.get_json()
+    log = CalorieLog(
+        user_id=current_user.id,
+        date=date.fromisoformat(d.get('date', date.today().isoformat())),
+        type=d['type'],
+        name=d['name'],
+        calories=int(d['calories']),
+    )
+    db.session.add(log)
+    db.session.commit()
+    return jsonify({'id': log.id}), 201
+
+
+@api_bp.route('/api/calories/<int:log_id>', methods=['DELETE'])
+@login_required
+def delete_calorie(log_id):
+    log = CalorieLog.query.filter_by(id=log_id, user_id=current_user.id).first_or_404()
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({'message': '削除しました'})
+
+
+# ── ダッシュボード ────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/dashboard')
+@login_required
+def get_dashboard():
+    today = date.today()
+    profile = current_user.profile
+
+    today_log = WeightLog.query.filter_by(user_id=current_user.id, date=today).first()
+    latest_log = WeightLog.query.filter_by(user_id=current_user.id).order_by(WeightLog.date.desc()).first()
+    current_weight = latest_log.weight if latest_log else profile.start_weight
+
+    days_remaining = max(0, (profile.target_date - today).days)
+    weight_remaining = round(current_weight - profile.target_weight, 1)
+
+    required_pace = (weight_remaining / days_remaining * 7) if days_remaining > 0 else 0
+
+    week_ago = today - timedelta(days=7)
+    old_log = WeightLog.query.filter(
+        WeightLog.user_id == current_user.id,
+        WeightLog.date >= week_ago,
+    ).order_by(WeightLog.date).first()
+
+    actual_pace = 0.0
+    if old_log and latest_log and old_log.id != latest_log.id:
+        diff_days = (latest_log.date - old_log.date).days
+        if diff_days > 0:
+            actual_pace = (old_log.weight - latest_log.weight) / diff_days * 7
+
+    if actual_pace == 0:
+        pace_status = 'no_data'
+    elif actual_pace >= required_pace:
+        pace_status = 'on_track'
+    elif actual_pace >= required_pace * 0.7:
+        pace_status = 'slightly_behind'
+    else:
+        pace_status = 'behind'
+
+    today_calories = CalorieLog.query.filter_by(user_id=current_user.id, date=today).all()
+    total_intake = sum(l.calories for l in today_calories if l.type == 'meal')
+    total_burned = sum(l.calories for l in today_calories if l.type == 'exercise')
+
+    nutrition = _calc_nutrition(profile, current_weight)
+
+    return jsonify({
+        'today_weight': today_log.weight if today_log else None,
+        'current_weight': current_weight,
+        'target_weight': profile.target_weight,
+        'weight_remaining': weight_remaining,
+        'days_remaining': days_remaining,
+        'target_date': profile.target_date.isoformat(),
+        'required_pace_per_week': round(required_pace, 2),
+        'actual_pace_per_week': round(actual_pace, 2),
+        'pace_status': pace_status,
+        'calorie_intake': total_intake,
+        'calorie_burned': total_burned,
+        'calorie_remaining': nutrition['recommended_intake'] - total_intake + total_burned,
+        'recommended_intake': nutrition['recommended_intake'],
+    })
+
+
+# ── 予測・分析 ────────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/analysis')
+@login_required
+def get_analysis():
+    profile = current_user.profile
+    logs = WeightLog.query.filter_by(user_id=current_user.id).order_by(WeightLog.date).all()
+
+    if len(logs) < 2:
+        return jsonify({'has_data': False, 'error': '予測には2日以上の記録が必要です'})
+
+    start_date = logs[0].date
+    x = [(l.date - start_date).days for l in logs]
+    y = [l.weight for l in logs]
+    n = len(x)
+    sx = sum(x)
+    sy = sum(y)
+    sxy = sum(xi * yi for xi, yi in zip(x, y))
+    sx2 = sum(xi ** 2 for xi in x)
+    denom = n * sx2 - sx ** 2
+
+    if denom == 0:
+        return jsonify({'has_data': False, 'error': '計算できません（全て同じ日付）'})
+
+    slope = (n * sxy - sx * sy) / denom
+    intercept = (sy - slope * sx) / n
+
+    predicted_goal_date = None
+    if slope < 0:
+        days_to_target = (profile.target_weight - intercept) / slope
+        predicted_goal_date = (start_date + timedelta(days=round(days_to_target))).isoformat()
+
+    target_days = (profile.target_date - start_date).days
+    predicted_at_target = intercept + slope * target_days
+    today = date.today()
+    current_weight = logs[-1].weight
+    nutrition = _calc_nutrition(profile, current_weight)
+
+    return jsonify({
+        'has_data': True,
+        'slope_per_week': round(slope * 7, 2),
+        'predicted_goal_date': predicted_goal_date,
+        'target_date': profile.target_date.isoformat(),
+        'predicted_weight_at_target': round(predicted_at_target, 1),
+        'will_reach_goal': predicted_at_target <= profile.target_weight,
+        'days_remaining': max(0, (profile.target_date - today).days),
+        'bmr': nutrition['bmr'],
+        'tdee': nutrition['tdee'],
+        'required_deficit': nutrition['required_deficit'],
+        'recommended_intake': nutrition['recommended_intake'],
+        'data_points': n,
+    })

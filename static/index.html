@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダイエット管理</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="logo">⚡</div>
+    <h1>ダイエット管理</h1>
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-tab="login">ログイン</button>
+      <button class="auth-tab-btn" data-tab="register">新規登録</button>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label>メールアドレス</label>
+        <input type="email" id="login-email" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>パスワード</label>
+        <input type="password" id="login-password" required autocomplete="current-password">
+      </div>
+      <div id="login-error" class="error-msg"></div>
+      <button type="submit" class="btn-primary">ログイン</button>
+    </form>
+
+    <form id="register-form" class="hidden">
+      <div class="form-group">
+        <label>メールアドレス</label>
+        <input type="email" id="reg-email" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>パスワード（8文字以上）</label>
+        <input type="password" id="reg-password" required autocomplete="new-password">
+      </div>
+      <div id="register-error" class="error-msg"></div>
+      <button type="submit" class="btn-primary">アカウント作成</button>
+    </form>
+  </div>
+</div>
+
+<!-- アプリ本体 -->
+<div id="app-screen" class="hidden">
+  <header>
+    <span class="header-title">ダイエット管理</span>
+    <button id="logout-btn" class="btn-ghost">ログアウト</button>
+  </header>
+
+  <main>
+    <!-- ダッシュボード -->
+    <section id="tab-dashboard" class="tab-content">
+      <div class="cards-grid">
+        <div class="card" id="today-weight-card">
+          <div class="card-label">今日の体重</div>
+          <div class="card-value text-muted">読み込み中...</div>
+        </div>
+        <div class="card" id="days-remaining-card">
+          <div class="card-label">残り日数</div>
+          <div class="card-value text-muted">--</div>
+        </div>
+        <div class="card" id="pace-card">
+          <div class="card-label">ペース</div>
+          <div class="card-value text-muted">--</div>
+        </div>
+        <div class="card" id="calorie-card">
+          <div class="card-label">今日のカロリー残り</div>
+          <div class="card-value text-muted">--</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 体重 -->
+    <section id="tab-weight" class="tab-content hidden">
+      <div class="card">
+        <h3>体重を記録</h3>
+        <form id="weight-form" class="form-row">
+          <div class="form-group" style="flex:1">
+            <label>日付</label>
+            <input type="date" id="weight-date">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>体重 (kg)</label>
+            <input type="number" id="weight-value" step="0.1" min="30" max="200" placeholder="60.0">
+          </div>
+          <div class="form-group" style="align-self:flex-end">
+            <button type="submit" class="btn-primary" style="margin-top:0">記録</button>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <canvas id="weight-chart" height="250"></canvas>
+      </div>
+      <div class="card">
+        <h3>記録一覧</h3>
+        <table id="weight-table">
+          <thead>
+            <tr>
+              <th>日付</th><th>体重</th><th>前日比</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="weight-empty" class="text-muted text-sm" style="margin-top:12px">記録がありません</p>
+      </div>
+    </section>
+
+    <!-- カロリー -->
+    <section id="tab-calorie" class="tab-content hidden">
+      <div class="card">
+        <div class="calorie-header">
+          <h3>カロリー管理</h3>
+          <input type="date" id="calorie-date-input">
+        </div>
+        <div id="calorie-summary"></div>
+      </div>
+      <div class="card">
+        <div class="card-heading-row">
+          <h3>食事を追加</h3>
+          <button type="button" class="btn-claude" onclick="showClaudeModal('food')">
+            <span class="claude-icon">✦</span> Claudeに確認
+          </button>
+        </div>
+        <form id="meal-form">
+          <div class="form-row">
+            <div class="form-group" style="flex:1.5">
+              <label>食事名</label>
+              <input type="text" id="meal-name" placeholder="例: 昼食、コンビニ弁当">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>カロリー (kcal)</label>
+              <input type="number" id="meal-calories" min="1" max="5000" placeholder="500">
+            </div>
+            <div class="form-group" style="align-self:flex-end">
+              <button type="submit" class="btn-primary" style="margin-top:0;white-space:nowrap">追加</button>
+            </div>
+          </div>
+          <div id="meal-list"></div>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-heading-row">
+          <h3>運動を追加</h3>
+          <button type="button" class="btn-claude" onclick="showClaudeModal('exercise')">
+            <span class="claude-icon">✦</span> Claudeに確認
+          </button>
+        </div>
+        <form id="exercise-form">
+          <div class="form-row">
+            <div class="form-group" style="flex:1.5">
+              <label>運動名</label>
+              <input type="text" id="exercise-name" placeholder="例: ウォーキング30分">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>消費カロリー (kcal)</label>
+              <input type="number" id="exercise-calories" min="1" max="3000" placeholder="200">
+            </div>
+            <div class="form-group" style="align-self:flex-end">
+              <button type="submit" class="btn-primary" style="margin-top:0;white-space:nowrap">追加</button>
+            </div>
+          </div>
+          <div id="exercise-list"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 予測・分析 -->
+    <section id="tab-analysis" class="tab-content hidden">
+      <div class="card" id="analysis-content">
+        <p class="text-muted">読み込み中...</p>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="tab-settings" class="tab-content hidden">
+      <div class="card">
+        <h3>プロフィール設定</h3>
+        <form id="settings-form">
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label>身長 (cm)</label>
+              <input type="number" id="s-height" min="100" max="250">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>年齢</label>
+              <input type="number" id="s-age" min="10" max="100">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label>開始体重 (kg)</label>
+              <input type="number" id="s-start-weight" step="0.1">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>目標体重 (kg)</label>
+              <input type="number" id="s-target-weight" step="0.1">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>目標日</label>
+            <input type="date" id="s-target-date">
+          </div>
+          <div class="form-group">
+            <label>活動レベル</label>
+            <select id="s-activity">
+              <option value="sedentary">座り仕事が多い（ほぼ運動なし）</option>
+              <option value="light">軽い運動（週1〜3回）</option>
+              <option value="moderate">中程度の運動（週3〜5回）</option>
+              <option value="active">激しい運動（週6〜7回）</option>
+              <option value="very_active">非常に激しい運動（毎日）</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-primary">保存</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ボトムナビ -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="dashboard">
+      <span class="tab-icon">&#127968;</span>
+      <span class="tab-label">ホーム</span>
+    </button>
+    <button class="tab-btn" data-tab="weight">
+      <span class="tab-icon">&#9881;</span>
+      <span class="tab-label">体重</span>
+    </button>
+    <button class="tab-btn" data-tab="calorie">
+      <span class="tab-icon">&#127859;</span>
+      <span class="tab-label">カロリー</span>
+    </button>
+    <button class="tab-btn" data-tab="analysis">
+      <span class="tab-icon">&#128200;</span>
+      <span class="tab-label">予測</span>
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <span class="tab-icon">&#9881;</span>
+      <span class="tab-label">設定</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Claude モーダル -->
+<div id="claude-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span id="claude-modal-title">Claudeで確認</span>
+      <button class="modal-close" onclick="closeClaudeModal()">×</button>
+    </div>
+    <p class="modal-desc text-muted text-sm">以下のプロンプトをコピーして、Claude.aiに貼り付けてください。<br>食事の写真も一緒に送ると精度が上がります。</p>
+    <textarea id="claude-prompt-text" class="claude-prompt-area" readonly></textarea>
+    <div class="modal-actions">
+      <button class="btn-copy" onclick="copyClaudePrompt()">コピー</button>
+      <a href="https://claude.ai/project/019e95a4-ea00-74f4-8d50-cfef3f89f437" target="_blank" rel="noopener" class="btn-open-claude">Claude.aiを開く</a>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
