@@ -468,6 +468,67 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .calorie-item.editing input:first-of-type { flex: 1.5; }
 .calorie-item.editing input:nth-of-type(2) { flex: 0 0 80px; }
 
+/* ── 履歴タブ ─────────────────────────────────────────────── */
+.history-card { padding: 14px 16px; }
+
+.history-day-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.history-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.history-badge {
+  font-size: 11px;
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 2px 8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.badge-exercise { color: var(--success); }
+
+.history-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.history-section-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.history-item:last-child { border-bottom: none; }
+.history-item-name { flex: 1; color: var(--text); }
+.history-item-cal  { color: var(--text-muted); font-size: 12px; white-space: nowrap; margin-left: 8px; }
+
+/* 6タブ対応: アイコン・ラベルを少し小さく */
+.tab-icon  { font-size: 18px; }
+.tab-label { font-size: 9px; }
+.tab-btn   { padding: 8px 2px 10px; }
+
 /* ── レスポンシブ ─────────────────────────────────────── */
 @media (max-width: 400px) {
   .cards-grid { grid-template-columns: 1fr; }

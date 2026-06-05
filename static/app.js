@@ -7,7 +7,9 @@ let lastCalorieData = null;
 // ── ユーティリティ ────────────────────────────────────────────────────────────
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  // 日本時間（UTC+9）で今日の日付を返す
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return jst.toISOString().split('T')[0];
 }
 
 async function api(url, method = 'GET', body = null) {
@@ -57,6 +59,7 @@ function showTab(name) {
   else if (name === 'weight')    loadWeight();
   else if (name === 'calorie')   loadCalories(selectedCalorieDate);
   else if (name === 'analysis')  loadAnalysis();
+  else if (name === 'history')   loadHistory();
   else if (name === 'settings')  loadSettings();
 }
 
@@ -441,6 +444,54 @@ async function loadAnalysis() {
         <div class="analysis-value text-accent">${data.recommended_intake} kcal</div>
       </div>
     </div>`;
+}
+
+// ── 履歴タブ ──────────────────────────────────────────────────────────────────
+
+async function loadHistory() {
+  const el = document.getElementById('history-content');
+  el.innerHTML = '<p class="text-muted text-sm">読み込み中...</p>';
+  const res = await api('/api/history');
+  if (!res) return;
+  const days = await res.json();
+
+  if (days.length === 0) {
+    el.innerHTML = '<p class="text-muted text-sm">記録がありません</p>';
+    return;
+  }
+
+  el.innerHTML = days.map(day => {
+    const net = day.total_intake - day.total_burned;
+    const netCls = net > 2000 ? 'text-danger' : net > 1500 ? 'text-warning' : 'text-success';
+
+    const mealRows = day.meals.map(m =>
+      `<div class="history-item"><span class="history-item-name">${escapeAttr(m.name)}</span><span class="history-item-cal">${m.calories} kcal</span></div>`
+    ).join('');
+
+    const exRows = day.exercises.map(e =>
+      `<div class="history-item"><span class="history-item-name">${escapeAttr(e.name)}</span><span class="history-item-cal text-success">-${e.calories} kcal</span></div>`
+    ).join('');
+
+    const mealSection = day.meals.length > 0
+      ? `<div class="history-section"><div class="history-section-title">🍽 食事</div>${mealRows}</div>`
+      : '';
+    const exSection = day.exercises.length > 0
+      ? `<div class="history-section"><div class="history-section-title">🏃 運動</div>${exRows}</div>`
+      : '';
+
+    return `
+      <div class="card history-card">
+        <div class="history-day-header">
+          <div class="history-date">${day.date}</div>
+          <div class="history-badges">
+            <span class="history-badge">食 ${day.total_intake} kcal</span>
+            ${day.total_burned > 0 ? `<span class="history-badge badge-exercise">運 -${day.total_burned} kcal</span>` : ''}
+            <span class="history-badge ${netCls}">計 ${net} kcal</span>
+          </div>
+        </div>
+        ${mealSection}${exSection}
+      </div>`;
+  }).join('');
 }
 
 // ── 設定タブ ──────────────────────────────────────────────────────────────────

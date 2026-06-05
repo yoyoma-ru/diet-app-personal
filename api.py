@@ -1,9 +1,15 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from models import db, Profile, WeightLog, CalorieLog
 
 api_bp = Blueprint('api', __name__)
+
+JST = timezone(timedelta(hours=9))
+
+def today_jst():
+    """日本時間（UTC+9）の今日の日付を返す"""
+    return datetime.now(JST).date()
 
 ACTIVITY_FACTORS = {
     'sedentary': 1.2,
@@ -17,7 +23,7 @@ ACTIVITY_FACTORS = {
 def _calc_nutrition(profile, current_weight):
     bmr = 10 * current_weight + 6.25 * profile.height - 5 * profile.age + 5
     tdee = bmr * ACTIVITY_FACTORS.get(profile.activity_level, 1.2)
-    days_remaining = max(1, (profile.target_date - date.today()).days)
+    days_remaining = max(1, (profile.target_date - today_jst()).days)
     weight_to_lose = max(0.0, current_weight - profile.target_weight)
     required_deficit = weight_to_lose * 7700 / days_remaining
     recommended = max(1200, tdee - required_deficit)
@@ -84,7 +90,7 @@ def get_weight():
 @login_required
 def add_weight():
     d = request.get_json()
-    log_date = date.fromisoformat(d.get('date', date.today().isoformat()))
+    log_date = date.fromisoformat(d.get('date', today_jst().isoformat()))
     weight = float(d['weight'])
 
     existing = WeightLog.query.filter_by(user_id=current_user.id, date=log_date).first()
@@ -146,7 +152,7 @@ def add_calorie():
     d = request.get_json()
     log = CalorieLog(
         user_id=current_user.id,
-        date=date.fromisoformat(d.get('date', date.today().isoformat())),
+        date=date.fromisoformat(d.get('date', today_jst().isoformat())),
         type=d['type'],
         name=d['name'],
         calories=int(d['calories']),
@@ -183,7 +189,7 @@ def delete_calorie(log_id):
 @api_bp.route('/api/dashboard')
 @login_required
 def get_dashboard():
-    today = date.today()
+    today = today_jst()
     profile = current_user.profile
 
     today_log = WeightLog.query.filter_by(user_id=current_user.id, date=today).first()
@@ -273,7 +279,7 @@ def get_analysis():
 
     target_days = (profile.target_date - start_date).days
     predicted_at_target = intercept + slope * target_days
-    today = date.today()
+    today = today_jst()
     current_weight = logs[-1].weight
     nutrition = _calc_nutrition(profile, current_weight)
 
@@ -291,3 +297,37 @@ def get_analysis():
         'recommended_intake': nutrition['recommended_intake'],
         'data_points': n,
     })
+
+
+# ── 日別履歴 ──────────────────────────────────────────────────────────────────
+
+@api_bp.route('/api/history')
+@login_required
+def get_history():
+    from collections import defaultdict
+    sixty_ago = today_jst() - timedelta(days=60)
+    logs = CalorieLog.query.filter(
+        CalorieLog.user_id == current_user.id,
+        CalorieLog.date >= sixty_ago,
+    ).order_by(CalorieLog.date.desc()).all()
+
+    by_date = defaultdict(lambda: {'meals': [], 'exercises': []})
+    for log in logs:
+        d = log.date.isoformat()
+        entry = {'id': log.id, 'name': log.name, 'calories': log.calories}
+        if log.type == 'meal':
+            by_date[d]['meals'].append(entry)
+        else:
+            by_date[d]['exercises'].append(entry)
+
+    result = []
+    for d, data in sorted(by_date.items(), reverse=True):
+        result.append({
+            'date': d,
+            'meals': data['meals'],
+            'exercises': data['exercises'],
+            'total_intake': sum(m['calories'] for m in data['meals']),
+            'total_burned': sum(e['calories'] for e in data['exercises']),
+        })
+
+    return jsonify(result)
