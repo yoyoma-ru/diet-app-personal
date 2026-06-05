@@ -156,6 +156,19 @@ def add_calorie():
     return jsonify({'id': log.id}), 201
 
 
+@api_bp.route('/api/calories/<int:log_id>', methods=['PUT'])
+@login_required
+def update_calorie(log_id):
+    log = CalorieLog.query.filter_by(id=log_id, user_id=current_user.id).first_or_404()
+    d = request.get_json()
+    if 'name' in d:
+        log.name = d['name']
+    if 'calories' in d:
+        log.calories = int(d['calories'])
+    db.session.commit()
+    return jsonify({'id': log.id, 'name': log.name, 'calories': log.calories})
+
+
 @api_bp.route('/api/calories/<int:log_id>', methods=['DELETE'])
 @login_required
 def delete_calorie(log_id):

@@ -336,15 +336,43 @@ function renderCalories(data) {
   renderCalorieList('exercise-list', data.exercises);
 }
 
+function escapeAttr(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function renderCalorieList(elementId, items) {
   const el = document.getElementById(elementId);
   if (!items.length) { el.innerHTML = '<p class="text-muted text-sm" style="margin-top:8px">記録なし</p>'; return; }
   el.innerHTML = items.map(item => `
-    <div class="calorie-item">
-      <span class="calorie-item-name">${item.name}</span>
+    <div class="calorie-item" data-id="${item.id}" data-name="${escapeAttr(item.name)}" data-calories="${item.calories}">
+      <span class="calorie-item-name">${escapeAttr(item.name)}</span>
       <span class="calorie-item-kcal">${item.calories} kcal</span>
+      <button class="btn-edit" onclick="editCalorie(${item.id})">✎</button>
       <button class="btn-delete" onclick="deleteCalorie(${item.id})">×</button>
     </div>`).join('');
+}
+
+function editCalorie(id) {
+  const item = document.querySelector(`.calorie-item[data-id="${id}"]`);
+  if (!item) return;
+  const name     = item.dataset.name;
+  const calories = item.dataset.calories;
+  item.classList.add('editing');
+  item.innerHTML = `
+    <input type="text"   class="edit-name" value="${escapeAttr(name)}">
+    <input type="number" class="edit-cal"  value="${calories}" min="1" max="5000">
+    <button class="btn-edit" style="color:var(--success)" onclick="saveCalorieEdit(${id})">✓</button>
+    <button class="btn-delete" onclick="loadCalories(selectedCalorieDate)">✗</button>`;
+  item.querySelector('.edit-name').focus();
+}
+
+async function saveCalorieEdit(id) {
+  const item     = document.querySelector(`.calorie-item[data-id="${id}"]`);
+  const name     = item.querySelector('.edit-name').value.trim();
+  const calories = parseInt(item.querySelector('.edit-cal').value);
+  if (!name || !calories) return;
+  const res = await api(`/api/calories/${id}`, 'PUT', { name, calories });
+  if (res && res.ok) loadCalories(selectedCalorieDate);
 }
 
 async function deleteCalorie(id) {
@@ -580,32 +608,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadCalories(e.target.value);
   });
 
-  // 食事フォーム
+  // 食事フォーム（一括）
   document.getElementById('meal-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const name     = document.getElementById('meal-name').value.trim();
-    const calories = parseInt(document.getElementById('meal-calories').value);
-    if (!name || !calories) return;
-    const res = await api('/api/calories', 'POST', { type: 'meal', name, calories, date: selectedCalorieDate });
-    if (res && res.status === 201) {
-      document.getElementById('meal-name').value     = '';
-      document.getElementById('meal-calories').value = '';
-      loadCalories(selectedCalorieDate);
-    }
+    const rows = document.querySelectorAll('#meal-form .bulk-input-row');
+    const items = [];
+    rows.forEach(row => {
+      const name     = row.querySelector('.meal-name-input').value.trim();
+      const calories = parseInt(row.querySelector('.meal-cal-input').value);
+      if (name && calories > 0) items.push({ name, calories });
+    });
+    if (!items.length) return;
+    await Promise.all(items.map(item =>
+      api('/api/calories', 'POST', { type: 'meal', name: item.name, calories: item.calories, date: selectedCalorieDate })
+    ));
+    document.querySelectorAll('#meal-form .meal-name-input, #meal-form .meal-cal-input').forEach(i => i.value = '');
+    loadCalories(selectedCalorieDate);
   });
 
-  // 運動フォーム
+  // 運動フォーム（一括）
   document.getElementById('exercise-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const name     = document.getElementById('exercise-name').value.trim();
-    const calories = parseInt(document.getElementById('exercise-calories').value);
-    if (!name || !calories) return;
-    const res = await api('/api/calories', 'POST', { type: 'exercise', name, calories, date: selectedCalorieDate });
-    if (res && res.status === 201) {
-      document.getElementById('exercise-name').value     = '';
-      document.getElementById('exercise-calories').value = '';
-      loadCalories(selectedCalorieDate);
-    }
+    const rows = document.querySelectorAll('#exercise-form .bulk-input-row');
+    const items = [];
+    rows.forEach(row => {
+      const name     = row.querySelector('.exercise-name-input').value.trim();
+      const calories = parseInt(row.querySelector('.exercise-cal-input').value);
+      if (name && calories > 0) items.push({ name, calories });
+    });
+    if (!items.length) return;
+    await Promise.all(items.map(item =>
+      api('/api/calories', 'POST', { type: 'exercise', name: item.name, calories: item.calories, date: selectedCalorieDate })
+    ));
+    document.querySelectorAll('#exercise-form .exercise-name-input, #exercise-form .exercise-cal-input').forEach(i => i.value = '');
+    loadCalories(selectedCalorieDate);
   });
 
   // 設定フォーム

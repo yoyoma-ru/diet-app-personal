@@ -397,6 +397,56 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 }
 .btn-open-claude:hover { opacity: 0.88; }
 
+/* ── 一括入力グリッド ─────────────────────────────────── */
+.bulk-input-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.bulk-input-header {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.bulk-input-header span:first-child { flex: 1.5; }
+.bulk-input-header span:last-child  { flex: 1; }
+.bulk-input-row {
+  display: flex;
+  gap: 8px;
+}
+.bulk-input-row input {
+  width: auto;
+  min-width: 0;
+}
+.bulk-input-row input:first-child { flex: 1.5; }
+.bulk-input-row input:last-child  { flex: 1; }
+
+/* ── 編集ボタン ───────────────────────────────────────── */
+.btn-edit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 15px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.btn-edit:hover { color: var(--accent); }
+
+.calorie-item.editing input {
+  width: auto;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 14px;
+  border-color: var(--accent);
+}
+.calorie-item.editing input:first-of-type { flex: 1.5; }
+.calorie-item.editing input:nth-of-type(2) { flex: 0 0 80px; }
+
 /* ── レスポンシブ ─────────────────────────────────────── */
 @media (max-width: 400px) {
   .cards-grid { grid-template-columns: 1fr; }
