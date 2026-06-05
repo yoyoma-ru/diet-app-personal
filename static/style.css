@@ -436,6 +436,27 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   transition: color 0.2s;
 }
 .btn-edit:hover { color: var(--accent); }
+.btn-save-edit {
+  background: none;
+  border: 1px solid var(--success);
+  color: var(--success);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-cancel-edit {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-cancel-edit:hover { border-color: var(--text-muted); }
 
 .calorie-item.editing input {
   width: auto;

@@ -347,8 +347,8 @@ function renderCalorieList(elementId, items) {
     <div class="calorie-item" data-id="${item.id}" data-name="${escapeAttr(item.name)}" data-calories="${item.calories}">
       <span class="calorie-item-name">${escapeAttr(item.name)}</span>
       <span class="calorie-item-kcal">${item.calories} kcal</span>
-      <button class="btn-edit" onclick="editCalorie(${item.id})">✎</button>
-      <button class="btn-delete" onclick="deleteCalorie(${item.id})">×</button>
+      <button type="button" class="btn-edit" onclick="editCalorie(${item.id})">✎</button>
+      <button type="button" class="btn-delete" onclick="deleteCalorie(${item.id})">×</button>
     </div>`).join('');
 }
 
@@ -361,8 +361,8 @@ function editCalorie(id) {
   item.innerHTML = `
     <input type="text"   class="edit-name" value="${escapeAttr(name)}">
     <input type="number" class="edit-cal"  value="${calories}" min="1" max="5000">
-    <button class="btn-edit" style="color:var(--success)" onclick="saveCalorieEdit(${id})">✓</button>
-    <button class="btn-delete" onclick="loadCalories(selectedCalorieDate)">✗</button>`;
+    <button type="button" class="btn-save-edit" onclick="saveCalorieEdit(${id})">✓</button>
+    <button type="button" class="btn-cancel-edit" onclick="loadCalories(selectedCalorieDate)">取消</button>`;
   item.querySelector('.edit-name').focus();
 }
 
