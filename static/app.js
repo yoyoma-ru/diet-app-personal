@@ -84,8 +84,8 @@ async function login(email, password) {
   return data.error;
 }
 
-async function register(email, password) {
-  const res = await api('/api/auth/register', 'POST', { email, password });
+async function register(email, password, inviteCode) {
+  const res = await api('/api/auth/register', 'POST', { email, password, invite_code: inviteCode });
   if (!res) return '接続エラー';
   const data = await res.json();
   if (res.ok) { showAppScreen(); showTab('dashboard'); return null; }
@@ -506,6 +506,52 @@ async function loadSettings() {
   document.getElementById('s-target-weight').value= d.target_weight;
   document.getElementById('s-target-date').value  = d.target_date;
   document.getElementById('s-activity').value     = d.activity_level;
+  loadInviteCodes();
+}
+
+// ── 招待コード管理 ────────────────────────────────────────────────────────────
+
+async function loadInviteCodes() {
+  const res = await api('/api/invite-codes');
+  if (!res) return;
+  const codes = await res.json();
+  const el = document.getElementById('invite-code-list');
+  if (codes.length === 0) {
+    el.innerHTML = '<p class="text-muted text-sm">発行済みのコードはありません</p>';
+    return;
+  }
+  el.innerHTML = codes.map(c => `
+    <div class="invite-code-item ${c.used ? 'invite-used' : ''}">
+      <span class="invite-code-str">${c.code}</span>
+      <span class="invite-code-status ${c.used ? 'text-muted' : 'text-success'}">${c.used ? '使用済み' : '未使用'}</span>
+      ${!c.used
+        ? `<button class="btn-copy-code" onclick="copyInviteCode('${c.code}')">コピー</button>
+           <button class="btn-delete" onclick="deleteInviteCode(${c.id})">×</button>`
+        : ''}
+    </div>`).join('');
+}
+
+async function generateInviteCode() {
+  const res = await api('/api/invite-codes', 'POST');
+  if (!res || !res.ok) { showToast('生成に失敗しました', 'danger'); return; }
+  const data = await res.json();
+  showToast(`発行しました: ${data.code}`, 'success');
+  loadInviteCodes();
+}
+
+async function copyInviteCode(code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast(`コピーしました: ${code}`, 'success');
+  } catch {
+    showToast('コピーに失敗しました', 'danger');
+  }
+}
+
+async function deleteInviteCode(id) {
+  if (!confirm('このコードを削除しますか？')) return;
+  const res = await api(`/api/invite-codes/${id}`, 'DELETE');
+  if (res && res.ok) { showToast('削除しました'); loadInviteCodes(); }
 }
 
 async function saveSettings(e) {
@@ -625,7 +671,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     const err = await register(
       document.getElementById('reg-email').value,
-      document.getElementById('reg-password').value
+      document.getElementById('reg-password').value,
+      document.getElementById('reg-invite-code').value.trim().toUpperCase()
     );
     if (err) document.getElementById('register-error').textContent = err;
   });

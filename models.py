@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
-from datetime import date
+from datetime import date, datetime
 
 db = SQLAlchemy()
 
@@ -46,3 +46,13 @@ class CalorieLog(db.Model):
     type = db.Column(db.String(10), nullable=False)  # 'meal' or 'exercise'
     name = db.Column(db.String(255), nullable=False)
     calories = db.Column(db.Integer, nullable=False)
+
+
+class InviteCode(db.Model):
+    __tablename__ = 'invite_codes'
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(20), unique=True, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    used_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

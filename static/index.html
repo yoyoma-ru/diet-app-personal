@@ -41,6 +41,10 @@
         <label>パスワード（8文字以上）</label>
         <input type="password" id="reg-password" required autocomplete="new-password">
       </div>
+      <div class="form-group">
+        <label>招待コード <span class="text-muted text-sm">（初回登録は不要）</span></label>
+        <input type="text" id="reg-invite-code" autocomplete="off" placeholder="XXXXXXXX" style="text-transform:uppercase;letter-spacing:2px">
+      </div>
       <div id="register-error" class="error-msg"></div>
       <button type="submit" class="btn-primary">アカウント作成</button>
     </form>
@@ -218,6 +222,13 @@
           </div>
           <button type="submit" class="btn-primary">保存</button>
         </form>
+      </div>
+
+      <div class="card">
+        <h3>招待コード管理</h3>
+        <p class="text-muted text-sm" style="margin-bottom:14px">友人・家族に招待コードを発行できます。コードは1回のみ使用可能です。</p>
+        <button type="button" class="btn-primary" style="margin-bottom:16px" onclick="generateInviteCode()">+ 新しいコードを発行</button>
+        <div id="invite-code-list"><p class="text-muted text-sm">読み込み中...</p></div>
       </div>
     </section>
   </main>

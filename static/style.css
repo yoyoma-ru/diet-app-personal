@@ -529,6 +529,39 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .tab-label { font-size: 9px; }
 .tab-btn   { padding: 8px 2px 10px; }
 
+/* ── 招待コード ───────────────────────────────────────── */
+.invite-code-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.invite-code-item:last-child { border-bottom: none; }
+.invite-code-str {
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--accent);
+  flex: 1;
+}
+.invite-used .invite-code-str { color: var(--text-muted); }
+.invite-code-status { font-size: 12px; white-space: nowrap; }
+.btn-copy-code {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.btn-copy-code:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ── レスポンシブ ─────────────────────────────────────── */
 @media (max-width: 400px) {
   .cards-grid { grid-template-columns: 1fr; }

@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from datetime import date, timedelta, datetime, timezone
-from models import db, Profile, WeightLog, CalorieLog
+import secrets
+import string
+from models import db, Profile, WeightLog, CalorieLog, InviteCode
 
 api_bp = Blueprint('api', __name__)
 
@@ -331,3 +333,52 @@ def get_history():
         })
 
     return jsonify(result)
+
+
+# ── 招待コード管理 ────────────────────────────────────────────────────────────
+
+def _generate_unique_code():
+    """重複しない8文字の英数字コードを生成"""
+    alphabet = string.ascii_uppercase + string.digits
+    while True:
+        code = ''.join(secrets.choice(alphabet) for _ in range(8))
+        if not InviteCode.query.filter_by(code=code).first():
+            return code
+
+
+@api_bp.route('/api/invite-codes')
+@login_required
+def list_invite_codes():
+    codes = InviteCode.query.filter_by(created_by=current_user.id).order_by(InviteCode.created_at.desc()).all()
+    return jsonify([{
+        'id': c.id,
+        'code': c.code,
+        'used': c.used_by is not None,
+        'used_at': c.used_at.isoformat() if c.used_at else None,
+        'created_at': c.created_at.isoformat(),
+    } for c in codes])
+
+
+@api_bp.route('/api/invite-codes', methods=['POST'])
+@login_required
+def create_invite_code():
+    code = _generate_unique_code()
+    inv = InviteCode(
+        code=code,
+        created_by=current_user.id,
+        created_at=datetime.now(JST),
+    )
+    db.session.add(inv)
+    db.session.commit()
+    return jsonify({'id': inv.id, 'code': code}), 201
+
+
+@api_bp.route('/api/invite-codes/<int:code_id>', methods=['DELETE'])
+@login_required
+def delete_invite_code(code_id):
+    inv = InviteCode.query.filter_by(id=code_id, created_by=current_user.id).first_or_404()
+    if inv.used_by is not None:
+        return jsonify({'error': '使用済みのコードは削除できません'}), 400
+    db.session.delete(inv)
+    db.session.commit()
+    return jsonify({'message': '削除しました'})
