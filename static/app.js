@@ -465,11 +465,21 @@ async function loadHistory() {
     const netCls = net > 2000 ? 'text-danger' : net > 1500 ? 'text-warning' : 'text-success';
 
     const mealRows = day.meals.map(m =>
-      `<div class="history-item"><span class="history-item-name">${escapeAttr(m.name)}</span><span class="history-item-cal">${m.calories} kcal</span></div>`
+      `<div class="history-item" data-id="${m.id}" data-name="${escapeAttr(m.name)}" data-calories="${m.calories}" data-max="5000">
+        <span class="history-item-name">${escapeAttr(m.name)}</span>
+        <span class="history-item-cal">${m.calories} kcal</span>
+        <button type="button" class="btn-edit" onclick="editHistoryItem(${m.id})">✎</button>
+        <button type="button" class="btn-delete" onclick="deleteHistoryItem(${m.id})">×</button>
+      </div>`
     ).join('');
 
     const exRows = day.exercises.map(e =>
-      `<div class="history-item"><span class="history-item-name">${escapeAttr(e.name)}</span><span class="history-item-cal text-success">-${e.calories} kcal</span></div>`
+      `<div class="history-item" data-id="${e.id}" data-name="${escapeAttr(e.name)}" data-calories="${e.calories}" data-max="3000">
+        <span class="history-item-name">${escapeAttr(e.name)}</span>
+        <span class="history-item-cal text-success">-${e.calories} kcal</span>
+        <button type="button" class="btn-edit" onclick="editHistoryItem(${e.id})">✎</button>
+        <button type="button" class="btn-delete" onclick="deleteHistoryItem(${e.id})">×</button>
+      </div>`
     ).join('');
 
     const mealSection = day.meals.length > 0
@@ -492,6 +502,36 @@ async function loadHistory() {
         ${mealSection}${exSection}
       </div>`;
   }).join('');
+}
+
+function editHistoryItem(id) {
+  const item = document.querySelector(`.history-item[data-id="${id}"]`);
+  if (!item) return;
+  const name     = item.dataset.name;
+  const calories = item.dataset.calories;
+  const max      = item.dataset.max || 5000;
+  item.classList.add('editing');
+  item.innerHTML = `
+    <input type="text"   class="edit-name" value="${escapeAttr(name)}">
+    <input type="number" class="edit-cal"  value="${calories}" min="1" max="${max}">
+    <button type="button" class="btn-save-edit" onclick="saveHistoryEdit(${id})">✓</button>
+    <button type="button" class="btn-cancel-edit" onclick="loadHistory()">取消</button>`;
+  item.querySelector('.edit-name').focus();
+}
+
+async function saveHistoryEdit(id) {
+  const item     = document.querySelector(`.history-item[data-id="${id}"]`);
+  const name     = item.querySelector('.edit-name').value.trim();
+  const calories = parseInt(item.querySelector('.edit-cal').value);
+  if (!name || !calories) return;
+  const res = await api(`/api/calories/${id}`, 'PUT', { name, calories });
+  if (res && res.ok) { showToast('修正しました'); loadHistory(); }
+}
+
+async function deleteHistoryItem(id) {
+  if (!confirm('この記録を削除しますか？')) return;
+  const res = await api(`/api/calories/${id}`, 'DELETE');
+  if (res && res.ok) { showToast('削除しました'); loadHistory(); }
 }
 
 // ── 設定タブ ──────────────────────────────────────────────────────────────────
