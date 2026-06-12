@@ -11,18 +11,26 @@ load_dotenv()
 def create_app():
     app = Flask(__name__, static_folder='static', static_url_path='/static')
     app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    # SQLiteのロック待ちは10秒で打ち切る。長すぎるとワーカーが固まり全体が遅くなるため。
-    # 同時書き込みはAPI側の一括エンドポイントで1トランザクションに集約し、競合自体を減らす。
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'connect_args': {
-            'check_same_thread': False,
-            'timeout': 10,
-        },
-        'pool_recycle': 280,
-        'pool_pre_ping': True,
-    }
+
+    # DATABASE_URL があればそれを使う（本番=PythonAnywhereのMySQL）。
+    # 無ければローカル開発用にSQLiteへフォールバックする。
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # MySQL（PythonAnywhere）。
+        # PythonAnywhereは約5分でアイドル接続を切るため、pool_recycleで先回りして張り直す。
+        # これをしないと "MySQL server has gone away" エラーになる。
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_recycle': 280,
+            'pool_pre_ping': True,
+        }
+    else:
+        # ローカル開発用 SQLite
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'connect_args': {'check_same_thread': False, 'timeout': 10},
+        }
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = False
 
