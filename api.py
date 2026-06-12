@@ -164,6 +164,33 @@ def add_calorie():
     return jsonify({'id': log.id}), 201
 
 
+@api_bp.route('/api/calories/bulk', methods=['POST'])
+@login_required
+def add_calories_bulk():
+    """複数の食事・運動を1トランザクションでまとめて登録する。
+    フロントが並列POSTするとSQLiteのロック競合を起こすため、1リクエストに集約する。"""
+    d = request.get_json()
+    log_date = date.fromisoformat(d.get('date', today_jst().isoformat()))
+    items = d.get('items', [])
+    created = []
+    for item in items:
+        name = (item.get('name') or '').strip()
+        calories = item.get('calories')
+        if not name or not calories:
+            continue
+        log = CalorieLog(
+            user_id=current_user.id,
+            date=log_date,
+            type=item['type'],
+            name=name,
+            calories=int(calories),
+        )
+        db.session.add(log)
+        created.append(log)
+    db.session.commit()
+    return jsonify({'ids': [l.id for l in created], 'count': len(created)}), 201
+
+
 @api_bp.route('/api/calories/<int:log_id>', methods=['PUT'])
 @login_required
 def update_calorie(log_id):

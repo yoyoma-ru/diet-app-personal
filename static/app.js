@@ -307,6 +307,27 @@ async function deleteWeight(id) {
 
 // ── カロリータブ ──────────────────────────────────────────────────────────────
 
+// 複数行の入力を1リクエストにまとめて送信する（並列POSTによるDBロック競合を回避）
+async function submitBulkCalories(type, formSel, nameSel, calSel) {
+  const rows = document.querySelectorAll(`${formSel} .bulk-input-row`);
+  const items = [];
+  rows.forEach(row => {
+    const name     = row.querySelector(nameSel).value.trim();
+    const calories = parseInt(row.querySelector(calSel).value);
+    if (name && calories > 0) items.push({ type, name, calories });
+  });
+  if (!items.length) return;
+
+  const res = await api('/api/calories/bulk', 'POST', { items, date: selectedCalorieDate });
+  if (res && (res.ok || res.status === 201)) {
+    document.querySelectorAll(`${formSel} ${nameSel}, ${formSel} ${calSel}`).forEach(i => i.value = '');
+    showToast(`${items.length}件を追加しました`);
+    loadCalories(selectedCalorieDate);
+  } else {
+    showToast('追加に失敗しました', 'danger');
+  }
+}
+
 async function loadCalories(dateStr) {
   selectedCalorieDate = dateStr || todayStr();
   document.getElementById('calorie-date-input').value = selectedCalorieDate;
@@ -452,8 +473,16 @@ async function loadHistory() {
   const el = document.getElementById('history-content');
   el.innerHTML = '<p class="text-muted text-sm">読み込み中...</p>';
   const res = await api('/api/history');
-  if (!res) return;
-  const days = await res.json();
+  if (!res) { el.innerHTML = '<p class="text-muted text-sm">読み込めませんでした。通信状況を確認してください。</p>'; return; }
+  if (!res.ok) { el.innerHTML = '<p class="text-danger text-sm">読み込みエラー（サーバー側で問題が発生しました）。</p>'; return; }
+
+  let days;
+  try {
+    days = await res.json();
+  } catch {
+    el.innerHTML = '<p class="text-danger text-sm">データの解析に失敗しました。</p>';
+    return;
+  }
 
   if (days.length === 0) {
     el.innerHTML = '<p class="text-muted text-sm">記録がありません</p>';
@@ -747,39 +776,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 食事フォーム（一括）
-  document.getElementById('meal-form').addEventListener('submit', async e => {
+  document.getElementById('meal-form').addEventListener('submit', e => {
     e.preventDefault();
-    const rows = document.querySelectorAll('#meal-form .bulk-input-row');
-    const items = [];
-    rows.forEach(row => {
-      const name     = row.querySelector('.meal-name-input').value.trim();
-      const calories = parseInt(row.querySelector('.meal-cal-input').value);
-      if (name && calories > 0) items.push({ name, calories });
-    });
-    if (!items.length) return;
-    await Promise.all(items.map(item =>
-      api('/api/calories', 'POST', { type: 'meal', name: item.name, calories: item.calories, date: selectedCalorieDate })
-    ));
-    document.querySelectorAll('#meal-form .meal-name-input, #meal-form .meal-cal-input').forEach(i => i.value = '');
-    loadCalories(selectedCalorieDate);
+    submitBulkCalories('meal', '#meal-form', '.meal-name-input', '.meal-cal-input');
   });
 
   // 運動フォーム（一括）
-  document.getElementById('exercise-form').addEventListener('submit', async e => {
+  document.getElementById('exercise-form').addEventListener('submit', e => {
     e.preventDefault();
-    const rows = document.querySelectorAll('#exercise-form .bulk-input-row');
-    const items = [];
-    rows.forEach(row => {
-      const name     = row.querySelector('.exercise-name-input').value.trim();
-      const calories = parseInt(row.querySelector('.exercise-cal-input').value);
-      if (name && calories > 0) items.push({ name, calories });
-    });
-    if (!items.length) return;
-    await Promise.all(items.map(item =>
-      api('/api/calories', 'POST', { type: 'exercise', name: item.name, calories: item.calories, date: selectedCalorieDate })
-    ));
-    document.querySelectorAll('#exercise-form .exercise-name-input, #exercise-form .exercise-cal-input').forEach(i => i.value = '');
-    loadCalories(selectedCalorieDate);
+    submitBulkCalories('exercise', '#exercise-form', '.exercise-name-input', '.exercise-cal-input');
   });
 
   // 設定フォーム

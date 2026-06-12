@@ -12,14 +12,17 @@ load_dotenv()
 def create_app():
     app = Flask(__name__, static_folder='static', static_url_path='/static')
     app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
-    # SQLiteのロックタイムアウトを30秒に設定（PythonAnywhereのNFSロック対策）
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db?timeout=30'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # SQLiteのロック待ちは10秒で打ち切る。長すぎるとワーカーが固まり全体が遅くなるため。
+    # 同時書き込みはAPI側の一括エンドポイントで1トランザクションに集約し、競合自体を減らす。
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'connect_args': {
             'check_same_thread': False,
-            'timeout': 30,
-        }
+            'timeout': 10,
+        },
+        'pool_recycle': 280,
+        'pool_pre_ping': True,
     }
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = False
