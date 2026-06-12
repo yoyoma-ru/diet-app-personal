@@ -1,5 +1,4 @@
 import os
-import time
 from flask import Flask, send_from_directory
 from dotenv import load_dotenv
 from models import db
@@ -37,16 +36,10 @@ def create_app():
     def index():
         return send_from_directory('static', 'index.html')
 
-    with app.app_context():
-        for attempt in range(3):
-            try:
-                db.create_all()
-                break
-            except Exception:
-                if attempt < 2:
-                    time.sleep(2)
-                else:
-                    raise
+    # 注意: ここでは db.create_all() を呼ばない。
+    # PythonAnywhereのNFS上では、Webワーカー起動のたびにスキーマロックを取りに行くと
+    # SQLiteがデッドロックし、database.db-journal が残ってサイト全体が固まる。
+    # テーブル作成が必要なとき（新テーブル追加・初回構築）だけ `python3 init_db.py` を手動実行する。
 
     return app
 
