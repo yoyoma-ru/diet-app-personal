@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: diet-app
+    runtime: python
+    plan: free
+    # ビルド時にライブラリを入れ、Neon上にテーブルを作成する（DATABASE_URLはビルド時も利用可）。
+    buildCommand: "pip install -r requirements.txt && python init_db.py"
+    # gunicornで起動。RenderはPORT環境変数を割り当てるのでそこにバインドする。
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # 下記2つはシークレットなのでリポジトリに置かず、Renderの管理画面で設定する。
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

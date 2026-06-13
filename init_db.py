@@ -1,15 +1,11 @@
-"""テーブルを作成・確認する一回限りのスクリプト。
+"""テーブルを作成・確認するスクリプト。
 
-新しいテーブルを追加したとき、または初回セットアップのときだけ手動で実行する:
+接続先（app.py参照）に対して db.create_all() を実行する。
+- Render(本番): render.yaml の buildCommand から呼ばれ、Neon Postgres上にテーブルを作る。
+- ローカル/その他: 手動で `python3 init_db.py` を実行すれば、その接続先にテーブルを作る。
 
-    python3 init_db.py
-
-通常のWebワーカー起動では db.create_all() を行わない（app.py参照）。
-PythonAnywhereのNFS上でSQLiteのスキーマロックがデッドロックし、
-サイト全体が固まる事故を防ぐため。
-
-※実行する際は、できればWebアプリをReloadで止めた直後など、
-  他からDBへの書き込みが走っていないタイミングが安全。
+通常のWebワーカー起動時には呼ばない（app.py参照）。SQLite運用時に起動毎の
+スキーマロックでデッドロックする事故を避ける名残だが、Postgresでも起動を軽くするため踏襲。
 """
 from app import app
 from models import db

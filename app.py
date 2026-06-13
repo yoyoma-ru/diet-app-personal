@@ -55,13 +55,16 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # DATABASE_URL があればそれを使う（本番=PythonAnywhereのMySQL）。
+    # DATABASE_URL があればそれを使う（本番=Render上のNeon Postgres）。
     # 無ければローカル開発用にSQLiteへフォールバックする。
     database_url = os.environ.get('DATABASE_URL')
     if database_url:
-        # MySQL（PythonAnywhere）。
-        # PythonAnywhereは約5分でアイドル接続を切るため、pool_recycleで先回りして張り直す。
-        # これをしないと "MySQL server has gone away" エラーになる。
+        # 一部サービスは古い "postgres://" 形式で渡してくるが、SQLAlchemyは
+        # "postgresql://" を要求するため正規化する。
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        # ネットワーク型DB（Postgres/MySQL）。
+        # アイドル接続が切られても困らないよう、pool_recycle/pre_pingで張り直す。
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'pool_recycle': 280,
